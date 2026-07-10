@@ -1,0 +1,4 @@
+codigo,criticidad,displayText
+S,1,Sin stock
+B,2,Bajo stock
+D,3,Disponible

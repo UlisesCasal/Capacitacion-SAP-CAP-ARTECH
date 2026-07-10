@@ -1,0 +1,3 @@
+libro_ID,ID,numero,titulo,paginas,createdAt,createdBy,modifiedAt,modifiedBy
+21696973-2c47-44d1-bffc-0bf1c2bd204d,52119496-7427-458d-9878-6d14c8ff9c60,42,titulo-5211949,48,2011-10-18T03:00:00.000Z,createdBy.33pkd@example.org,2012-10-11T03:00:00.000Z,modifiedBy.33pkd@example.com
+21696973-2c47-44d1-bffc-0bf1c2bd204d,5211950b-9dff-40c7-8ae8-53768f1a9940,92,titulo-5211950,15,2023-01-18T03:00:00.000Z,createdBy.33pke@example.net,2006-02-15T03:00:00.000Z,modifiedBy.33pke@example.net
