@@ -3,7 +3,7 @@ const util = require('./utils/util')
 
 module.exports = class LibreriaService extends cds.ApplicationService { init() {
 
-  const { Libros, Autores, EstadoLibros } = cds.entities('LibreriaService')
+  const { Libros, Autores, EstadoLibros, Capitulos } = cds.entities('LibreriaService')
 
   this.on('READ', Libros, async (req, next) => {
     const librosDB = await next()
@@ -13,16 +13,39 @@ module.exports = class LibreriaService extends cds.ApplicationService { init() {
       const data = await response.json()
       const librosAPI = util.formatearLibrosApi(data.results)
 
+      //Obtengo los libros que no estan persistidos en la base de datos
+      const idsExistentes = new Set(librosDB.map(l => l.ID))
+      const librosNuevos = librosAPI.filter(l => !idsExistentes.has(l.ID))
+      
+      //Persisto en la base de datos los libros que no existan
+      if(librosNuevos.length){
+        await cds.tx(req).run(
+          INSERT.into(Libros).entries(
+            librosNuevos.map(({ Capitulos, autorString, ...libro }) => libro)
+          )
+        )
+      }
+      //Caso del object page
       if(req.query.SELECT.one){
         if(librosDB) return librosDB
         return librosAPI.find(l => l.ID === req.data.ID)
       }
 
-      return [...librosDB,...librosAPI]
+      return [...librosDB,...librosNuevos]
 
     }catch(error){
       return librosDB
     }
+  })
+
+  this.on('READ', Capitulos, async (req, next) => {
+    const capitulosDB = await next()
+
+    //Le paso a la funcion todos los libros ya guardados 
+    const capitulosAPI = util.generarCapitulosApi(await cds.tx(req).run(SELECT.from(Libros)))
+
+    //Retorno un array con todos los capitulos que estan en la DB + los que se trae al generar con Faker
+    return [...capitulosDB, ...capitulosAPI]
   })
 
   /*
