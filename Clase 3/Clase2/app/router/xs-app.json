@@ -1,0 +1,22 @@
+{
+  "welcomeFile": "/index.html",
+  "authenticationMethod": "none",
+  "routes": [
+    {
+      "source": "^/odata/(.*)$",
+      "target": "/odata/$1",
+      "destination": "srv-api",
+      "csrfProtection": true
+    },
+    {
+      "source": "^/\\$metadata$",
+      "target": "/$metadata",
+      "destination": "srv-api"
+    },
+    {
+      "source": "^(.*)$",
+      "target": "$1",
+      "localDir": "resources/libreria"
+    }
+  ]
+}

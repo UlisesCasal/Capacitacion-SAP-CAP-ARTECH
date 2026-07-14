@@ -1,0 +1,51 @@
+{
+  "name": "Clase2",
+  "version": "1.0.0",
+  "description": "A simple CAP project.",
+  "repository": "<Add your repository here>",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@sap/cds": "^9",
+    "express": "^4",
+    "@cap-js/postgres": "^2",
+    "@faker-js/faker": "^10.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@cap-js/cds-types": "^0.12.0",
+    "@cap-js/sqlite": "^2",
+    "@sap/cds-dk": "^9",
+    "cds-plugin-ui5": "^0.17.0"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "start:pg": "cds-serve --profile pg",
+    "watch-libreria": "cds watch --open libreria/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-libreria:pg": "cds watch --profile pg --open libreria/index.html?sap-ui-xx-viewCache=false --livereload false"
+  },
+  "workspaces": [
+    "app/*"
+  ],
+  "sapux": [
+    "app/libreria"
+  ],
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "postgres",
+        "vcap": {
+          "label": "user-provided"
+        },
+        "pool": {
+          "acquireTimeoutMillis": 15000
+        }
+      },
+      "auth": {
+        "kind": "dummy"
+      }
+    }
+  }
+}
