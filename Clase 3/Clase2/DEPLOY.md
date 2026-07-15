@@ -9,12 +9,41 @@ Foundry, usando Supabase como base de datos Postgres externa.
   ```powershell
   cf login -a https://api.cf.us10-003.hana.ondemand.com
   ```
+- Plugin `multiapps` de `cf` (necesario para `cf deploy`, no viene con el CLI base):
+  ```powershell
+  cf install-plugin multiapps -r CF-Community
+  ```
+- Un **dev space** creado en el subaccount de BTP trial (si todavía no existe
+  ninguno). Se puede crear desde el cockpit de BTP o por CLI:
+  ```powershell
+  cf create-space dev
+  cf target -s dev
+  ```
 - `mbt` (Multi-Target App Build Tool) instalado:
   ```powershell
   npm install -g mbt
   ```
 - Una base Postgres externa ya creada (Supabase) con host, puerto, usuario,
   password y database a mano.
+
+---
+
+## Parte 0 — Scaffolding inicial del proyecto CAP
+
+Si el proyecto todavía no tiene soporte de Postgres ni el `mta.yaml` generado,
+hay que agregarlos antes de tocar nada más:
+
+```bash
+cds add postgres
+cds add mta
+```
+
+- `cds add postgres` agrega `@cap-js/postgres` a las dependencias y genera la
+  config base de `cds.requires.db` en `package.json` (que después se ajusta a
+  mano para apuntar a un servicio externo, ver paso 1).
+- `cds add mta` genera el `mta.yaml` inicial con los módulos `srv` y
+  `postgres-deployer` ya cableados. A partir de ahí se edita para usar
+  `existing-service` (paso 3) en vez de un servicio managed.
 
 ---
 
@@ -49,17 +78,37 @@ En `package.json` (raíz):
   `@requires`/`@restrict` ni servicio XSUAA, se fuerza `dummy` para no
   necesitar esa infraestructura.
 
-### 2. Mover dependencias de runtime fuera de `devDependencies`
+### 2. Dependencias de runtime: nunca declaradas en ambos lados a la vez
 
 Si código en `srv/` usa algo en runtime (ej. `@faker-js/faker` en
-`srv/utils/util.js`), tiene que estar en `dependencies`, no en
-`devDependencies` — el build de producción (`npm ci --production`) no instala
-`devDependencies`, y la app crashea con `MODULE_NOT_FOUND` en Cloud Foundry.
+`srv/utils/util.js`), tiene que estar **solo** en `dependencies`.
+
+**Ojo con el error más sutil**: si el mismo paquete queda declarado a la vez
+en `dependencies` Y en `devDependencies` (típico cuando se instaló primero
+como dev tool y después se promovió a runtime, sin borrar la entrada vieja),
+npm resuelve el conflicto marcándolo `"dev": true` en `package-lock.json`.
+El builder `npm-ci` del `mta.yaml` (`build-parameters: builder: npm-ci`)
+instala en modo producción (`npm ci --omit=dev`), así que respeta ese flag y
+**no instala el paquete — sin tirar ningún error visible en el build**. La
+carpeta del paquete queda vacía dentro de `gen/srv/node_modules` (y dentro
+del `.mtar` final), y recién explota en runtime en Cloud Foundry con
+`Cannot find module`.
 
 ```powershell
 npm install
 ```
-(regenera `package-lock.json` después de mover la dependencia)
+(regenera `package-lock.json` después de sacar la dependencia duplicada de
+`devDependencies`)
+
+**Verificación antes de deployar** — confirmar que el paquete quedó
+efectivamente instalado (no solo la carpeta vacía) en el módulo que se va a
+empaquetar:
+
+```powershell
+ls gen/srv/node_modules/@faker-js/faker
+```
+Si el comando no devuelve nada (carpeta vacía o inexistente), el `.mtar` va a
+fallar en runtime aunque el build no haya mostrado ningún error.
 
 ### 3. Configurar `mta.yaml` para usar un servicio externo, no uno managed
 
@@ -220,7 +269,7 @@ Deberían aparecer 3 apps:
 | Síntoma | Causa probable | Dónde mirar |
 |---|---|---|
 | `Service plan development not found` | `mta.yaml` apunta a un servicio managed que no existe/no está entitled | Cambiar a `existing-service` + user-provided service |
-| `Cannot find module 'X'` en runtime | Dependencia en `devDependencies` en vez de `dependencies` | `package.json` → mover a `dependencies`, `npm install`, rebuild |
+| `Cannot find module 'X'` en runtime | Dependencia solo en `devDependencies`, o duplicada en `dependencies` **y** `devDependencies` (npm la marca `"dev": true` en el lockfile y `npm-ci --omit=dev` la salta en silencio) | `package.json` → dejarla solo en `dependencies`, `npm install`, verificar con `ls gen/srv/node_modules/<paquete>` antes de rebuildear |
 | `Cannot find module '@sap/xssec'` | CAP activa auth `jwt` en producción sin XSUAA bindeado | `cds.requires.auth.kind: "dummy"` en `package.json` |
 | `TimeoutError: ResourceRequest timed out` conectando a la base | Casi nunca es red — probar TCP (`cf ssh` + `/dev/tcp`) y luego el handshake TLS real con un script Node mínimo | Revisar `ssl` en las credenciales del user-provided service |
 | Cambios en credenciales del servicio no toman efecto | Apps ya corriendo no recargan `VCAP_SERVICES` solas | `cf restage`/`cf restart` del app bindeado |
